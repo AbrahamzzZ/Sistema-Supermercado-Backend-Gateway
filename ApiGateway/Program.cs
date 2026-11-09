@@ -2,15 +2,16 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile("ocelot.json", false, true);
+var ocelotFile = $"ocelot.{builder.Environment.EnvironmentName}.json";
+if (!File.Exists(Path.Combine(builder.Environment.ContentRootPath, ocelotFile)))
+    ocelotFile = "ocelot.json";
 
-// Configuración de clave JWT
+builder.Configuration.AddJsonFile(ocelotFile, optional: false, reloadOnChange: true);
+
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = jwtSettings.GetValue<string>("Key");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -19,7 +20,9 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
+    options.Authority = jwtSettings["Authority"];
+    options.RequireHttpsMetadata = jwtSettings.GetValue("RequireHttpsMetadata", true);
+    options.RefreshInterval = TimeSpan.FromSeconds(30);
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -28,8 +31,8 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey =
-            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
+        ValidAlgorithms = new[] { SecurityAlgorithms.RsaSha256 },
+        ClockSkew = TimeSpan.FromSeconds(30)
     };
 });
 
@@ -40,7 +43,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
