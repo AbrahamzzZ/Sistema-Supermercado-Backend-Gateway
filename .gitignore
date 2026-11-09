@@ -42,3 +42,7 @@ Thumbs.db
 *.vscode/
 *.coverage/
 *.publish/
+
+# Claves privadas (JWT RS256)
+secrets/
+*.pem
