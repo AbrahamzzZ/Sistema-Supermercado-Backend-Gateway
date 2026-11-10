@@ -113,8 +113,18 @@ El orden de arranque lo controla el propio compose:
 
 1. `sqlserver` y `kafka` arrancan y esperan a estar *healthy*.
 2. `kafka-init` crea el tópico `movimientos-stock` y termina.
-3. Los microservicios arrancan; cada uno **aplica sus migraciones** de EF Core automáticamente al iniciar.
+3. Los microservicios arrancan; cada uno **aplica sus migraciones** de EF Core automáticamente al iniciar:
+   tablas, **stored procedures** y **datos iniciales** (roles, menús, usuario administrador, negocio, categorías y sucursales).
 4. El `gateway` arranca al final.
+
+### Usuario inicial
+
+| Correo | Clave | Rol |
+|---|---|---|
+| `admin@supermercado.com` | `Admin123*` | Administrador |
+
+> ⚠️ Cambia esta clave después del primer inicio de sesión. Se guarda con un hash antiguo (SHA-256) y Auth la
+> convierte automáticamente a **BCrypt** en el primer login.
 
 Ver el estado y los logs:
 
@@ -133,6 +143,7 @@ docker compose logs -f auth-api          # o admin-api, order-api, inventory-api
 | Inventory (Swagger) | http://localhost:8003/swagger |
 | Order (Swagger) | http://localhost:8004/swagger |
 | Kafka UI | http://localhost:8090 |
+| **Seq (logs de todos los servicios)** | http://localhost:5341 |
 | SQL Server | `localhost,14330` · usuario `sa` · contraseña `SA_PASSWORD` |
 | Kafka (desde el host) | `localhost:29092` |
 
@@ -204,6 +215,68 @@ Gateway/Admin/Order/Inventory ──GET /.well-known/jwks.json──► validan 
 (`docker compose restart auth-api`). El `kid` cambia solo y los demás servicios descargan la nueva clave pública
 al recibir un token con un `kid` desconocido. Los tokens firmados con la clave anterior dejan de ser válidos.
 
+**Contraseñas:** se guardan con **BCrypt** (work factor 11) y se verifican en C#, no en SQL. Las claves con el
+hash antiguo (SHA-256) siguen funcionando y se convierten a BCrypt en el siguiente login exitoso.
+
+---
+
+## Auditoría y borrado lógico
+
+Las tablas de datos maestros (Admin), `USUARIO` (Auth) y `PRODUCTO_STOCK` (Inventory) tienen las mismas columnas:
+
+| Columna | Quién la llena |
+|---|---|
+| `ID_USUARIO_CREACION` / `ID_USUARIO_MODIFICACION` | El stored procedure, con el usuario **del token JWT** (nunca del body) |
+| `FECHA_CREACION` / `FECHA_MODIFICACION` | SQL Server con `SYSUTCDATETIME()` (**todas las fechas en UTC**) |
+
+- Cada servicio obtiene el usuario con `ICurrentUserService`, que lee el claim `NameIdentifier` del token.
+- **Borrado lógico:** `DELETE` no borra la fila; marca `ELIMINADO = 1` y guarda quién y cuándo. Los listados no
+  muestran registros eliminados. Así no se pierden datos que otros microservicios referencian (una venta antigua
+  sigue apuntando a su cliente).
+- **Compras y ventas** (Order) no llevan columnas de auditoría porque no se editan: `ID_USUARIO` (tomado del token)
+  y `FECHA_COMPRA` / `FECHA_VENTA` ya indican quién y cuándo.
+- **Kafka:** como Inventory procesa mensajes sin token, Order incluye `IdUsuario` en cada mensaje.
+
+## Historial de precios
+
+Inventory guarda en `HISTORIAL_PRECIO` cada cambio de precio de compra o de venta que llega con una compra. Solo
+se insertan registros, nunca se modifican. Así queda un respaldo de todos los precios que tuvo un producto.
+
+- `GET /inventory/ProductoStock/{idProducto}`: stock y precio actuales
+- `GET /inventory/ProductoStock/{idProducto}/historial-precios`: historial, del más reciente al más antiguo
+
+**Stock:** Order consulta el stock en Inventory **antes** de registrar una venta y la rechaza si no alcanza.
+Si aun así llega un movimiento sin stock (por ejemplo, dos ventas simultáneas), Inventory lo registra como
+`Warning` y descarta el mensaje en vez de reintentarlo indefinidamente.
+
+---
+
+## Logs (Serilog + Seq)
+
+Los 5 servicios escriben **logs estructurados** con Serilog en la consola y en **Seq**, un servidor central de logs
+con interfaz web: http://localhost:5341.
+
+| Nivel | Cuándo | Ejemplo |
+|---|---|---|
+| `Information` | Todo salió bien | "Venta 00012 registrada", peticiones 2xx |
+| `Warning` | Se incumplió una regla de negocio | stock insuficiente, código duplicado, login fallido, peticiones 4xx |
+| `Error` | Fallo técnico | excepción no controlada, base de datos o Kafka caídos, peticiones 5xx |
+
+**Correlation Id:** el Gateway genera un `X-Correlation-Id` por petición, o usa el que envíe el cliente. Ese id viaja
+a cada microservicio por HTTP y a Inventory en los headers de Kafka. Todos los logs lo llevan, así que en Seq
+puedes seguir una venta completa (Gateway → Order → Admin/Inventory → Kafka → Inventory) con un solo filtro:
+
+```
+CorrelationId = 'el-id-que-devolvio-la-respuesta'
+```
+
+Cada log incluye además `Servicio`, `IdUsuario`, método, ruta, código de estado y duración. Ante un error no
+controlado, la API responde `500` con el mensaje `Código de seguimiento: {correlationId}` para buscarlo en Seq.
+
+> **¿Por qué no una tabla LOG en cada base de datos?** Si la base de datos falla, no puedes registrar el error de que
+> la base falló. Además, cada log restaría rendimiento a la base de negocio y tendrías que consultar 4 bases
+> para seguir un problema. La tabla `LOG` de Order se mantiene por ahora para no romper el front (ver [Pendientes](#pendientes)).
+
 ---
 
 ## Desarrollo local (sin Docker)
@@ -211,7 +284,7 @@ al recibir un token con un `kid` desconocido. Los tokens firmados con la clave a
 1. **Infraestructura:** puedes levantar solo SQL Server y Kafka con Docker y correr las APIs desde Visual Studio:
 
    ```bash
-   docker compose up -d sqlserver kafka kafka-init kafka-ui
+   docker compose up -d sqlserver kafka kafka-init kafka-ui seq
    ```
 
    En ese caso usa `localhost,14330` en la cadena de conexión y `localhost:29092` como `Kafka:BootstrapServers`.
@@ -257,6 +330,7 @@ Todos los valores de `appsettings.json` se pueden sobrescribir con variables de 
 | `Kafka__BootstrapServers` | Order, Inventory | `kafka:9092` |
 | `Kafka__GroupId` / `Kafka__Enabled` | Inventory | `inventory-service` / `true` |
 | `Ollama__BaseUrl` | Admin | `http://host.docker.internal:11434` |
+| `Seq__ServerUrl` | Todos | `http://seq:80` |
 
 ---
 
@@ -268,13 +342,17 @@ Todos los valores de `appsettings.json` se pueden sobrescribir con variables de 
 | `401 Unauthorized` en todas las rutas justo después de levantar | Los servicios aún no descargaron la clave pública de Auth. Espera unos segundos y reintenta. |
 | `401` con un token que antes funcionaba | El token expiró, Auth se reinició con una clave temporal (sin `.pem`), o es un token antiguo HS256. Vuelve a hacer login. |
 | `auth-api` no arranca: *No se encontró la clave privada JWT* | Falta `secrets/jwt_private_key.pem`. Ver el [paso 2](#2-generar-la-clave-privada-para-firmar-los-jwt-solo-la-primera-vez). |
-| *Could not find stored procedure 'PA_...'* | Los stored procedures aún no forman parte de las migraciones (ver [Pendientes](#pendientes)). |
-| El stock no se actualiza tras una compra/venta | Revisa `docker compose logs inventory-api` y el tópico `movimientos-stock` en Kafka UI (http://localhost:8090). |
+| *Could not find stored procedure 'PA_...'* en los reportes de `/admin/Negocio/...` | Esos reportes todavía no están migrados (ver [Pendientes](#pendientes)). |
+| Venta rechazada con *"No se pudo verificar el stock"* | Inventory no responde. Revisa `docker compose logs inventory-api`. |
+| El stock no se actualiza tras una compra/venta | Busca el `CorrelationId` de la petición en Seq (http://localhost:5341) y revisa el tópico `movimientos-stock` en Kafka UI (http://localhost:8090). |
 | El reporte con IA de Admin falla | Ollama no está corriendo en tu máquina o falta el modelo: `ollama pull qwen3:8b`. |
 
 ---
 
 ## Pendientes
 
-- [ ] Agregar los **stored procedures** de cada microservicio a sus migraciones de EF Core
-      (`migrationBuilder.Sql(...)`), para que se creen automáticamente al levantar en Docker.
+- [ ] **Reportes de Admin** (`/admin/Negocio/producto-mas-vendido`, `top-clientes`, etc.): sus SP
+      (`PA_PRODUCTOS_MAS_VENDIDOS`, `PA_TOP_CLIENTES`, …) necesitan datos de compras y ventas, que viven en `DB_Order`.
+      Hay que decidir si se mueven a Order o si Admin los calcula consultando a Order por API.
+- [ ] **Tabla `LOG` de Order:** decidir si se elimina (los logs ya están en Seq) o si se mantiene para la pantalla del front.
+- [ ] Índice único para `PRODUCTO.CODIGO` y `USUARIO.CORREO_ELECTRONICO` (con borrado lógico conviene un índice filtrado `WHERE ELIMINADO = 0`).
