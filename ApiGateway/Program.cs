@@ -1,9 +1,24 @@
+using ApiGateway.Observabilidad;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
+using Serilog;
+using Serilog.Events;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Logs estructurados: consola + Seq (servidor central de logs de todos los microservicios)
+builder.Host.UseSerilog((ctx, sp, cfg) => cfg
+    .ReadFrom.Configuration(ctx.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Servicio", "Gateway")
+    .WriteTo.Console()
+    .WriteTo.Seq(ctx.Configuration["Seq:ServerUrl"] ?? "http://localhost:5341"));
+
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 var ocelotFile = $"ocelot.{builder.Environment.EnvironmentName}.json";
 if (!File.Exists(Path.Combine(builder.Environment.ContentRootPath, ocelotFile)))
@@ -42,6 +57,22 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseExceptionHandler();
+app.UseSerilogRequestLogging(o =>
+{
+    o.GetLevel = (ctx, _, ex) =>
+        ex != null || ctx.Response.StatusCode >= 500 ? LogEventLevel.Error
+        : ctx.Response.StatusCode >= 400 ? LogEventLevel.Warning
+        : LogEventLevel.Information;
+
+    o.EnrichDiagnosticContext = (diag, ctx) =>
+    {
+        diag.Set("IdUsuario", ctx.User.FindFirstValue(ClaimTypes.NameIdentifier));
+        diag.Set("CorrelationId", ctx.Items[CorrelationIdMiddleware.ItemKey]);
+    };
+});
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
 {
