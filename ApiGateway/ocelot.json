@@ -79,6 +79,7 @@
     }
   ],
   "GlobalConfiguration": {
+    "RequestIdKey": "X-Correlation-Id",
     "BaseUrl": "https://localhost:7134"
   }
 }
