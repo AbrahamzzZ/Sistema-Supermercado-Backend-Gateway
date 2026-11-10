@@ -18,6 +18,7 @@
 #     Inventory Swagger .......... http://localhost:8003/swagger
 #     Order Swagger .............. http://localhost:8004/swagger
 #     Kafka UI ................... http://localhost:8090
+#     Seq (logs) ................. http://localhost:5341
 #     SQL Server ................. localhost,14330  (usuario sa)
 #     Kafka (desde el host) ...... localhost:29092
 # =====================================================================
@@ -33,11 +34,24 @@ x-dotnet-env: &dotnet-env
   # Ninguno de ellos tiene la clave privada.
   Jwt__Authority: http://auth-api:8080
   Jwt__RequireHttpsMetadata: "false"   # dentro de la red de Docker se usa http
+  # Logs centralizados: todos los servicios envían sus logs a Seq
+  Seq__ServerUrl: http://seq:80
 
 services:
   # ------------------------------------------------------------------
   # Infraestructura
   # ------------------------------------------------------------------
+  seq:
+    image: datalust/seq:2024.3
+    container_name: supermercado-seq
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+    ports:
+      - "5341:80"
+    volumes:
+      - seq-data:/data
+
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: supermercado-sqlserver
@@ -213,3 +227,4 @@ secrets:
 volumes:
   sqlserver-data:
   kafka-data:
+  seq-data:
