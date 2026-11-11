@@ -11,6 +11,10 @@ Este repositorio contiene el **API Gateway (Ocelot)** y la **orquestación con D
 | **Order** | Compras, ventas y logs | [Sistema-Supermercado-Backend-Order](https://github.com/AbrahamzzZ/Sistema-Supermercado-Backend-Order) |
 | **Inventory** | Stock de productos y movimientos de inventario | [Sistema-Supermercado-Backend-Inventory](https://github.com/AbrahamzzZ/Sistema-Supermercado-Backend-Inventory) |
 
+**Frontend (Angular):** [Sistema-Supermercardo-Frontend](https://github.com/AbrahamzzZ/Sistema-Supermercardo-Frontend).
+Funciona con estos microservicios o con la versión monolítica del backend
+([Sistema-Supermercado-Backend](https://github.com/AbrahamzzZ/Sistema-Supermercado-Backend)); ver [Frontend](#frontend).
+
 **Tecnologías:** .NET 8 · Ocelot · Entity Framework Core (Code First) · SQL Server · Apache Kafka · JWT RS256 + JWKS · FluentValidation · Docker Compose
 
 ---
@@ -163,7 +167,7 @@ docker compose up -d --build admin-api   # reconstruir solo un servicio tras cam
 
 | Ruta en el Gateway | Se redirige a | Métodos | Requiere token |
 |---|---|---|---|
-| `POST /auth/login` | Auth `/api/Usuario/login` | POST | No |
+| `POST /auth/Usuario/login` | Auth `/api/Usuario/login` | POST | No |
 | `/auth/{...}` | Auth `/api/{...}` | GET, POST, PUT, DELETE | Sí |
 | `/admin/{...}` | Admin `/api/{...}` | GET, POST, PUT, DELETE | Sí |
 | `/order/{...}` | Order `/api/{...}` | GET, POST | Sí |
@@ -176,7 +180,7 @@ El Gateway carga automáticamente `ocelot.{ASPNETCORE_ENVIRONMENT}.json` si exis
 
 ```bash
 # 1. Login (devuelve el token)
-curl -X POST http://localhost:8000/auth/login \
+curl -X POST http://localhost:8000/auth/Usuario/login \
   -H "Content-Type: application/json" \
   -d '{ "correo_Electronico": "admin@correo.com", "clave": "tu-clave" }'
 
@@ -196,6 +200,21 @@ Sin configuración se acepta cualquier origen (desarrollo). En producción limit
 ```json
 "Cors": { "OrigenesPermitidos": [ "https://mi-frontend.com" ] }
 ```
+
+### Frontend
+
+El [frontend](https://github.com/AbrahamzzZ/Sistema-Supermercardo-Frontend) usa una URL por módulo, con el
+prefijo de cada microservicio en el Gateway:
+
+| Módulo del front | URL (microservicios) | Recursos |
+|---|---|---|
+| `admin` | `http://localhost:8000/admin/` | Categoria, Cliente, Negocio, Oferta, Producto, Proveedor, Sucursal, Transportista |
+| `auth` | `http://localhost:8000/auth/` | Usuario (login: `auth/Usuario/login`), Menu, Rol |
+| `order` | `http://localhost:8000/order/` | Compra, Venta, Log |
+| `inventory` | `http://localhost:8000/inventory/` | ProductoStock, MovimientoStock |
+
+Con `npm start` el front usa estos microservicios. Con `npm start -- --configuration monolito` usa el monolito
+(`http://localhost:5299/api/`). Los detalles están en el README del frontend.
 
 ---
 
