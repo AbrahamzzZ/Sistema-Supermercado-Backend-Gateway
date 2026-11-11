@@ -185,6 +185,18 @@ curl http://localhost:8000/admin/Producto \
   -H "Authorization: Bearer <token>"
 ```
 
+### CORS
+
+El frontend debe apuntar **solo al Gateway** (`http://localhost:8000`). Por eso CORS se configura **únicamente
+aquí** (política `Frontend` en `Program.cs`). Los microservicios no tienen CORS: el navegador nunca los llama
+directamente y entre servidores (Gateway → servicios, Order → Inventory) CORS no aplica.
+
+Sin configuración se acepta cualquier origen (desarrollo). En producción limita los orígenes en `appsettings.json`:
+
+```json
+"Cors": { "OrigenesPermitidos": [ "https://mi-frontend.com" ] }
+```
+
 ---
 
 ## Autenticación (JWT RS256 + JWKS)
