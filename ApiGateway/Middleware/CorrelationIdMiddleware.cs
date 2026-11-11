@@ -1,3 +1,5 @@
+using Serilog.Context;
+
 namespace ApiGateway.Middleware
 {
     public class CorrelationIdMiddleware

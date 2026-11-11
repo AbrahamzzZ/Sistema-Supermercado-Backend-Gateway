@@ -1,4 +1,4 @@
-using ApiGateway.Observabilidad;
+using ApiGateway.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Ocelot.DependencyInjection;
@@ -9,7 +9,6 @@ using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Logs estructurados: consola + Seq (servidor central de logs de todos los microservicios)
 builder.Host.UseSerilog((ctx, sp, cfg) => cfg
     .ReadFrom.Configuration(ctx.Configuration)
     .Enrich.FromLogContext()

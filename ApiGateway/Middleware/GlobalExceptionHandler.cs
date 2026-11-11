@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
+
 namespace ApiGateway.Middleware
 {
     public class GlobalExceptionHandler : IExceptionHandler
