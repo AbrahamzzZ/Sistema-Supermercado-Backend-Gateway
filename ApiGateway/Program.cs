@@ -50,6 +50,14 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+var origenes = builder.Configuration.GetSection("Cors:OrigenesPermitidos").Get<string[]>() ?? [];
+builder.Services.AddCors(options => options.AddPolicy("Frontend", policy =>
+{
+    if (origenes.Length > 0) policy.WithOrigins(origenes);
+    else policy.AllowAnyOrigin();
+    policy.AllowAnyHeader().AllowAnyMethod().WithExposedHeaders(CorrelationIdMiddleware.HeaderName);
+}));
+
 builder.Services.AddOcelot(builder.Configuration);
 
 builder.Services.AddEndpointsApiExplorer();
@@ -80,6 +88,8 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Docker"))
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("Frontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
