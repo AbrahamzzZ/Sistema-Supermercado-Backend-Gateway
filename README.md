@@ -373,17 +373,17 @@ Todos los valores de `appsettings.json` se pueden sobrescribir con variables de 
 | `401 Unauthorized` en todas las rutas justo después de levantar | Los servicios aún no descargaron la clave pública de Auth. Espera unos segundos y reintenta. |
 | `401` con un token que antes funcionaba | El token expiró, Auth se reinició con una clave temporal (sin `.pem`), o es un token antiguo HS256. Vuelve a hacer login. |
 | `auth-api` no arranca: *No se encontró la clave privada JWT* | Falta `secrets/jwt_private_key.pem`. Ver el [paso 2](#2-generar-la-clave-privada-para-firmar-los-jwt-solo-la-primera-vez). |
-| *Could not find stored procedure 'PA_...'* en los reportes de `/admin/Negocio/...` | Esos reportes todavía no están migrados (ver [Pendientes](#pendientes)). |
+| Los reportes de `/admin/Negocio/...` responden *"No se encontraron registros"* | Todavía no hay compras o ventas en `DB_Order`. |
+| Los reportes responden *"No se pudieron obtener los datos de otro servicio"* | Admin no pudo consultar a Order (o a Inventory/Auth) por el Gateway. Revisa `docker compose logs order-api` y busca el `CorrelationId` en Seq. |
 | Venta rechazada con *"No se pudo verificar el stock"* | Inventory no responde. Revisa `docker compose logs inventory-api`. |
 | El stock no se actualiza tras una compra/venta | Busca el `CorrelationId` de la petición en Seq (http://localhost:5341) y revisa el tópico `movimientos-stock` en Kafka UI (http://localhost:8090). |
-| El reporte con IA de Admin falla | Ollama no está corriendo en tu máquina o falta el modelo: `ollama pull qwen3:8b`. |
+| El asistente de IA responde *"El servicio de IA no está disponible"* | Ollama no está corriendo en tu máquina o falta el modelo: `ollama pull qwen3:8b`. |
 
 ---
 
 ## Pendientes
 
-- [ ] **Reportes de Admin** (`/admin/Negocio/producto-mas-vendido`, `top-clientes`, etc.): sus SP
-      (`PA_PRODUCTOS_MAS_VENDIDOS`, `PA_TOP_CLIENTES`, …) necesitan datos de compras y ventas, que viven en `DB_Order`.
-      Hay que decidir si se mueven a Order o si Admin los calcula consultando a Order por API.
+- [x] **Reportes de Admin** (`/admin/Negocio/...`): Order calcula los totales por ID (`/order/Estadistica/...`) y
+      Admin completa los nombres con sus propias tablas. Ver *Reportes del negocio* en el README de Admin.
 - [ ] **Tabla `LOG` de Order:** decidir si se elimina (los logs ya están en Seq) o si se mantiene para la pantalla del front.
 - [ ] Índice único para `PRODUCTO.CODIGO` y `USUARIO.CORREO_ELECTRONICO` (con borrado lógico conviene un índice filtrado `WHERE ELIMINADO = 0`).
