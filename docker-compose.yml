@@ -52,6 +52,30 @@ services:
     volumes:
       - seq-data:/data
 
+  # Se ejecuta una vez al levantar: crea la política de retención de Seq (borra logs de más de
+  # SEQ_RETENCION, 30d por defecto). Si ya existe una política, no hace nada.
+  seq-init:
+    image: datalust/seqcli:2024.3
+    container_name: supermercado-seq-init
+    depends_on:
+      - seq
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        SEQCLI=/bin/seqcli/seqcli
+        SERVER=http://seq:80
+        for i in $$(seq 1 30); do
+          $$SEQCLI node health -s $$SERVER > /dev/null 2>&1 && break
+          echo "Esperando a Seq..."; sleep 2
+        done
+        if [ -z "$$($$SEQCLI retention list -s $$SERVER)" ]; then
+          $$SEQCLI retention create -s $$SERVER --after ${SEQ_RETENCION:-30d} --delete-all-events
+          echo "Política de retención creada: ${SEQ_RETENCION:-30d}"
+        else
+          echo "Ya existe una política de retención:"; $$SEQCLI retention list -s $$SERVER
+        fi
+    restart: "no"
+
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: supermercado-sqlserver

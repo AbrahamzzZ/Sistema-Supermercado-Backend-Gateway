@@ -92,6 +92,15 @@ app.UseHttpsRedirection();
 app.UseCors("Frontend");
 
 app.UseAuthentication();
+
+app.Use(async (context, next) =>
+{
+    using (Serilog.Context.LogContext.PushProperty("IdUsuario", context.User.FindFirstValue(ClaimTypes.NameIdentifier)))
+    using (Serilog.Context.LogContext.PushProperty("RequestMethod", context.Request.Method))
+    {
+        await next();
+    }
+});
 app.UseAuthorization();
 
 await app.UseOcelot();
