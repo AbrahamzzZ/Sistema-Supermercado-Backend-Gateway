@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,6 +14,8 @@ namespace ApiGateway.Middleware
         {
             var correlationId = context.Items[CorrelationIdMiddleware.ItemKey]?.ToString();
 
+            using var logUsuario = Serilog.Context.LogContext.PushProperty("IdUsuario", context.User.FindFirstValue(ClaimTypes.NameIdentifier));
+            using var logMetodo = Serilog.Context.LogContext.PushProperty("RequestMethod", context.Request.Method);
             _logger.LogError(exception, "Error no controlado en {Metodo} {Endpoint}",
                 context.Request.Method, context.Request.Path);
 
