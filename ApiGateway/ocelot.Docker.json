@@ -4,7 +4,7 @@
       "DownstreamPathTemplate": "/api/Usuario/login",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [ { "Host": "auth-api", "Port": 8080 } ],
-      "UpstreamPathTemplate": "/auth/login",
+      "UpstreamPathTemplate": "/auth/Usuario/login",
       "UpstreamHttpMethod": [ "POST" ],
       "Priority": 1
     },

@@ -9,7 +9,7 @@
           "Port": 7186
         }
       ],
-      "UpstreamPathTemplate": "/auth/login",
+      "UpstreamPathTemplate": "/auth/Usuario/login",
       "UpstreamHttpMethod": [ "POST" ],
       "Priority": 1
     },

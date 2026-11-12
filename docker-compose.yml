@@ -156,6 +156,8 @@ services:
       ConnectionStrings__CadenaSQL: "Server=sqlserver,1433;Database=DB_Admin;User Id=sa;Password=${SA_PASSWORD:-Supermercado_2026!};TrustServerCertificate=True;"
       # Ollama corriendo en tu Windows (fuera de Docker)
       Ollama__BaseUrl: http://host.docker.internal:11434
+      # Reportes: Admin pide a Order/Inventory/Auth a través del Gateway
+      Services__GatewayUrl: http://gateway:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
