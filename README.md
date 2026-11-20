@@ -19,20 +19,6 @@ Funciona con estos microservicios o con el [backend monolítico](https://github.
 
 **Tecnologías:** .NET 8 · Ocelot · EF Core (Code First) · SQL Server · Apache Kafka · JWT RS256 + JWKS · Serilog + Seq · Docker Compose
 
-## Arquitectura
-
-```
-   Cliente (front/Postman) ──► API Gateway (Ocelot) :8000 ── valida JWT
-                                 │ /auth   │ /admin   │ /order   │ /inventory
-                                 ▼         ▼          ▼          ▼
-                               Auth      Admin      Order ──Kafka──► Inventory
-                                 │         │          │   "movimientos-stock" │
-                              DB_Auth   DB_Admin   DB_Order           DB_Inventory
-```
-
-Cada servicio tiene su propia base de datos. Se comunican por HTTP **a través del Gateway** y por **Kafka**
-(Order publica los movimientos de stock e Inventory los consume). Los logs de todos van a **Seq**.
-
 ## Levantar todo con Docker
 
 Requisitos: **Docker Desktop** (4 GB de RAM o más), **Git** y **Git Bash** (para OpenSSL).
