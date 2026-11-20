@@ -30,11 +30,8 @@ x-dotnet-env: &dotnet-env
   ASPNETCORE_HTTP_PORTS: "8080"
   Jwt__Issuer: SupermercadoAPI
   Jwt__Audience: SupermercadoClient
-  # JWT RS256: Gateway/Admin/Inventory/Order descargan la clave PÚBLICA de Auth (JWKS).
-  # Ninguno de ellos tiene la clave privada.
   Jwt__Authority: http://auth-api:8080
-  Jwt__RequireHttpsMetadata: "false"   # dentro de la red de Docker se usa http
-  # Logs centralizados: todos los servicios envían sus logs a Seq
+  Jwt__RequireHttpsMetadata: "false"  
   Seq__ServerUrl: http://seq:80
 
 services:
@@ -52,8 +49,7 @@ services:
     volumes:
       - seq-data:/data
 
-  # Se ejecuta una vez al levantar: crea la política de retención de Seq (borra logs de más de
-  # SEQ_RETENCION, 30d por defecto). Si ya existe una política, no hace nada.
+  # Se ejecuta una vez al levantar: crea la política de retención de Seq (borra logs de más de SEQ_RETENCION, 30d por defecto). Si ya existe una política, no hace nada.
   seq-init:
     image: datalust/seqcli:2024.3
     container_name: supermercado-seq-init
@@ -178,12 +174,9 @@ services:
     environment:
       <<: *dotnet-env
       ConnectionStrings__CadenaSQL: "Server=sqlserver,1433;Database=DB_Admin;User Id=sa;Password=${SA_PASSWORD:-Supermercado_2026!};TrustServerCertificate=True;"
-      # Ollama corriendo en tu Windows (fuera de Docker)
-      Ollama__BaseUrl: http://host.docker.internal:11434
-      # Reportes: Admin pide a Order/Inventory/Auth a través del Gateway
+      # Proveedor externo de IA; define OPENAI_API_KEY en el entorno o en .env local
+      OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       Services__GatewayUrl: http://gateway:8080
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "8001:8080"
     depends_on:
@@ -245,8 +238,6 @@ services:
     restart: on-failure
 
 secrets:
-  # Generar una sola vez (ver README de Docker / .env.example):
-  #   openssl genrsa -out secrets/jwt_private_key.pem 2048
   jwt_private_key:
     file: ./secrets/jwt_private_key.pem
 
