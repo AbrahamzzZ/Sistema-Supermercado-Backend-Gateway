@@ -41,10 +41,9 @@ mkdir -p secrets
 openssl genrsa -out secrets/jwt_private_key.pem 2048
 ```
 
-> ⚠️ `secrets/` está en `.gitignore`. Nunca subas la clave privada.
-
-**3. (Opcional)** Copiar `.env.example` como `.env` para cambiar la contraseña de SQL Server (`SA_PASSWORD`) o los
-días que Seq guarda los logs (`SEQ_RETENCION`, 30 días por defecto).
+**3.** Copiar `.env.example` como `.env`. Ahí va la clave de OpenAI para el asistente de IA (`OPENAI_API_KEY`); sin ella
+todo funciona menos el asistente. También permite cambiar la contraseña de SQL Server (`SA_PASSWORD`) o los días que
+Seq guarda los logs (`SEQ_RETENCION`, 30 días por defecto).
 
 **4. Levantar:**
 
