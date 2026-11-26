@@ -80,5 +80,7 @@ docker compose down                        # detener (conserva los datos)
 docker compose down -v                     # detener y BORRAR bases, Kafka y logs
 ```
 
-Para ejecutar los servicios sin Docker, la configuración y los problemas comunes, ver el
-[manual técnico](docs/Manual%20Tecnico.docx).
+**Depurar un servicio desde Visual Studio:** con todo levantado, detén su contenedor (`docker compose stop admin-api`)
+y presiona F5 en ese servicio; se conecta solo a SQL Server, Kafka, Seq, Auth y el Gateway de Docker. Los pasos y
+excepciones (Auth) están en el README de cada servicio y en la sección 3.9 del [manual técnico](docs/Manual%20Tecnico.docx),
+junto con la configuración y los problemas comunes.
